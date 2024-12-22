@@ -64,11 +64,12 @@ const container = database.container(process.env.AZURE_COSMOS_CONTAINER_NAME!);
 export { container };
 ```
 
-### 3.2 データアクセスヘルパー
+### 3.2 データアクセスヘルパー (ビジネスロジック層)
 ```typescript
 // lib/cosmosHelpers.ts
 import { container } from './cosmosdb';
 import { CosmosTask, Task } from './types';
+import { handleCosmosError } from './errorHandling'; // Assuming errorHandling.ts exists
 
 export const cosmosHelpers = {
   // Cosmos DBモデルからアプリケーションモデルへの変換
@@ -94,12 +95,63 @@ export const cosmosHelpers = {
     };
   },
 
-  // クエリ結果の変換
-  async queryTasks(query: string): Promise<Task[]> {
-    const { resources } = await container.items
-      .query<CosmosTask>(query)
-      .fetchAll();
-    return resources.map(this.toTask);
+  // **CRUD Operations via cosmosHelpers**
+
+  // タスク一覧取得
+  async getTasks(): Promise<Task[]> {
+    try {
+      const { resources } = await container.items
+        .query<CosmosTask>('SELECT * FROM c WHERE c.type = "task" ORDER BY c.createdAt DESC')
+        .fetchAll();
+      return resources.map(this.toTask);
+    } catch (error) {
+      throw handleCosmosError(error);
+    }
+  },
+
+  // 特定のタスク取得
+  async getTask(id: string): Promise<Task | undefined> {
+    try {
+      const { resource } = await container.item(id, id).read<CosmosTask>();
+      return resource ? this.toTask(resource) : undefined;
+    } catch (error) {
+      throw handleCosmosError(error);
+    }
+  },
+
+  // タスク作成
+  async createTask(task: Omit<Task, 'id' | 'createdAt' | 'updatedAt'>): Promise<Task> {
+    try {
+      const cosmosTask = this.toCosmosTask(task);
+      const { resource } = await container.items.create(cosmosTask);
+      return this.toTask(resource);
+    } catch (error) {
+      throw handleCosmosError(error);
+    }
+  },
+
+  // タスク更新
+  async updateTask(id: string, updates: Partial<Omit<Task, 'id' | 'createdAt' | 'updatedAt'>>): Promise<Task | undefined> {
+    try {
+      const existingTask = await this.getTask(id);
+      if (!existingTask) {
+        return undefined;
+      }
+      const updatedCosmosTask: Partial<CosmosTask> = this.toCosmosTask({ ...existingTask, ...updates }, id);
+      const { resource } = await container.item(id, id).replace(updatedCosmosTask);
+      return this.toTask(resource);
+    } catch (error) {
+      throw handleCosmosError(error);
+    }
+  },
+
+  // タスク削除
+  async deleteTask(id: string): Promise<void> {
+    try {
+      await container.item(id, id).delete();
+    } catch (error) {
+      throw handleCosmosError(error);
+    }
   }
 };
 ```
@@ -109,15 +161,12 @@ export const cosmosHelpers = {
 ### 4.1 タスク一覧取得
 ```typescript
 // app/api/tasks/route.ts
-import { container } from '@/lib/cosmosdb';
 import { cosmosHelpers } from '@/lib/cosmosHelpers';
 import { NextResponse } from 'next/server';
 
 export async function GET() {
   try {
-    const tasks = await cosmosHelpers.queryTasks(
-      'SELECT * FROM c WHERE c.type = "task" ORDER BY c.createdAt DESC'
-    );
+    const tasks = await cosmosHelpers.getTasks();
     return NextResponse.json({ tasks });
   } catch (error) {
     return NextResponse.json(
@@ -130,23 +179,89 @@ export async function GET() {
 
 ### 4.2 タスク作成
 ```typescript
+// app/api/tasks/route.ts
+import { cosmosHelpers } from '@/lib/cosmosHelpers';
+import { NextResponse } from 'next/server';
+import { z } from 'zod';
+
+const taskSchema = z.object({
+  title: z.string().min(1),
+  description: z.string().optional(),
+  status: z.enum(['todo', 'in_progress', 'completed']).default('todo'),
+  priority: z.enum(['low', 'medium', 'high']).default('medium'),
+});
+
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const cosmosTask = cosmosHelpers.toCosmosTask(body);
-    const { resource } = await container.items.create(cosmosTask);
-    return NextResponse.json(cosmosHelpers.toTask(resource));
+    const validatedBody = taskSchema.parse(body);
+    const newTask = await cosmosHelpers.createTask(validatedBody);
+    return NextResponse.json(newTask, { status: 201 });
   } catch (error) {
     return NextResponse.json(
-      { error: 'Failed to create task' },
-      { status: 500 }
+      { error: 'Failed to create task', details: error },
+      { status: 400 }
     );
   }
 }
 ```
 
-## 5. パフォーマンス最適化
+### 4.3 特定のタスク取得、更新、削除
+```typescript
+// app/api/tasks/[id]/route.ts
+import { cosmosHelpers } from '@/lib/cosmosHelpers';
+import { NextResponse } from 'next/server';
+import { z } from 'zod';
 
+const updateTaskSchema = z.object({
+  title: z.string().min(1).optional(),
+  description: z.string().optional(),
+  status: z.enum(['todo', 'in_progress', 'completed']).optional(),
+  priority: z.enum(['low', 'medium', 'high']).optional(),
+});
+
+type PathParams = { params: { id: string } };
+
+export async function GET(request: Request, { params }: PathParams) {
+  const { id } = params;
+  try {
+    const task = await cosmosHelpers.getTask(id);
+    if (!task) {
+      return NextResponse.json({ error: 'Task not found' }, { status: 404 });
+    }
+    return NextResponse.json(task);
+  } catch (error) {
+    return NextResponse.json({ error: 'Failed to fetch task', details: error }, { status: 500 });
+  }
+}
+
+export async function PATCH(request: Request, { params }: PathParams) {
+  const { id } = params;
+  try {
+    const body = await request.json();
+    const updates = updateTaskSchema.parse(body);
+    const updatedTask = await cosmosHelpers.updateTask(id, updates);
+    if (!updatedTask) {
+      return NextResponse.json({ error: 'Task not found' }, { status: 404 });
+    }
+    return NextResponse.json(updatedTask);
+  } catch (error) {
+    return NextResponse.json({ error: 'Failed to update task', details: error }, { status: 400 });
+  }
+}
+
+export async function DELETE(request: Request, { params }: PathParams) {
+  const { id } = params;
+  try {
+    await cosmosHelpers.deleteTask(id);
+    return new NextResponse(null, { status: 204 });
+  } catch (error) {
+    return NextResponse.json({ error: 'Failed to delete task', details: error }, { status: 500 });
+  }
+}
+```
+
+## 5. パフォーマンス最適化
 ### 5.1 インデックス設定
 ```json
 {
@@ -201,7 +316,7 @@ class CosmosDBError extends Error {
 
 ### 6.2 エラーハンドリングパターン
 ```typescript
-// lib/errorHandling.ts
+// taskflow/lib/errorHandling.ts
 export const handleCosmosError = (error: any) => {
   if (error.code === 409) {
     return new CosmosDBError(

@@ -10,7 +10,7 @@
 ### フロントエンド構成
 1. **ページ構成**
    ```
-   app/
+   taskflow/app/
    ├── page.tsx (ダッシュボード)
    ├── tasks/
    │   ├── page.tsx (タスク一覧)
@@ -36,7 +36,7 @@
 
 #### 1. Cosmos DB設定
 ```typescript
-// lib/cosmosdb.ts
+// taskflow/lib/cosmosdb.ts
 const config = {
   databaseName: "taskflow-db",
   containerId: "tasks",
@@ -46,7 +46,7 @@ const config = {
 
 #### 2. API層
 ```
-app/api/
+taskflow/app/api/
 ├── tasks/
 │   ├── route.ts (GET, POST)
 │   └── [id]/
@@ -57,7 +57,7 @@ app/api/
 
 ### タスクモデル
 ```typescript
-// lib/types.ts
+// taskflow/lib/types.ts
 interface Task {
   id: string;
   title: string;
@@ -210,28 +210,28 @@ const container = database.container(process.env.AZURE_COSMOS_CONTAINER_NAME!);
 export { container };
 ```
 
-#### クエリ最適化
-1. インデックス設定
-```json
-{
-  "indexingMode": "consistent",
-  "automatic": true,
-  "includedPaths": [
-    {
-      "path": "/*"
-    }
-  ],
-  "excludedPaths": [
-    {
-      "path": "/description/?"
-    }
-  ]
-}
-```
+#### Cosmos DB ヘルパー (ビジネスロジック層)
+データアクセスに関するビジネスロジックは、`lib/cosmosHelpers.ts` に実装されます。このレイヤーは、データの取得、作成、更新、削除などの操作を抽象化し、APIルートから直接 Cosmos DB クライアントを操作することを防ぎます。
 
-2. パーティションキー戦略
-- タスクIDをパーティションキーとして使用
-- 単一タスクの読み取り/更新を効率化
+#### 提供される機能
+
+- **getTasks**: 全てのタスクを取得します。
+- **getTask**: 特定のIDを持つタスクを取得します。
+- **createTask**: 新しいタスクを作成します。
+- **updateTask**: 既存のタスクを更新します。
+- **deleteTask**: 特定のIDを持つタスクを削除します。
+
+#### API層
+
+APIルートは、`cosmosHelpers` の関数を利用してデータ操作を行います。これにより、ビジネスロジックとAPIのエンドポイントの責務が分離され、コードの保守性とテスト容易性が向上します。
+
+```
+app/api/
+├── tasks/
+│   └── route.ts (GET - cosmosHelpers.getTasks, POST - cosmosHelpers.createTask)
+│   └── [id]/
+│       └── route.ts (GET - cosmosHelpers.getTask, PATCH - cosmosHelpers.updateTask, DELETE - cosmosHelpers.deleteTask)
+```
 
 ### エラーハンドリング
 
