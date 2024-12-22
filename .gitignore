@@ -9,3 +9,5 @@ build
 out
 
 docs/demo
+taskflow/.next/
+**/.next/*
