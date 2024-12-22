@@ -5,7 +5,7 @@ import { NextResponse } from 'next/server';
 export async function GET() {
   try {
     const tasks = await getTasks();
-    return NextResponse.json({ tasks });
+    return NextResponse.json(tasks, {status: 200});
   } catch (error) {
     return NextResponse.json({ error: `Error: ${error}`}, { status: 500 });
   }

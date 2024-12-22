@@ -14,9 +14,13 @@ const TaskList = () => {
     return <div>Error: {"error.message"}</div>;
   }
 
+  if (!Array.isArray(tasks) || tasks.length === 0) {
+    return <div>No tasks found</div>;
+  }
+
   return (
     <div className="task-list">
-      {tasks!.map(task => (
+      {tasks.map(task => (
         <TaskCard key={task.id} task={task} />
       ))}
     </div>

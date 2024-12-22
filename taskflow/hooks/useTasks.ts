@@ -26,7 +26,6 @@ const useTasks = () => {
   const queryClient = useQueryClient();
 
   const tasksQuery = useQuery('tasks', fetchTasks);
-
   const createMutation = useMutation(createTask, {
     onSuccess: () => {
       queryClient.invalidateQueries('tasks');
