@@ -1,26 +1,41 @@
-# TaskFlow - Azure Cosmos DB 統合仕様書
+# TaskFlow - Azure Cosmos DB 統合詳細仕様書
 
-## 1. Cosmos DB 設定
+## 1. Azure Cosmos DBセットアップ
 
 ### 1.1 データベース構成
 ```json
 {
   "databaseName": "taskflow-db",
   "containerId": "tasks",
-  "partitionKey": "/id"
+  "partitionKey": "/id",
+  "throughput": 400
 }
 ```
 
-### 1.2 必要な環境変数
+### 1.2 環境変数設定
 ```env
+# .env.local
 AZURE_COSMOS_CONNECTION_STRING=your_connection_string
 AZURE_COSMOS_DATABASE_NAME=taskflow-db
 AZURE_COSMOS_CONTAINER_NAME=tasks
 ```
 
-## 2. データモデル
+## 2. データモデルとスキーマ
 
-### 2.1 Cosmos DB用タスクスキーマ
+### 2.1 ベースタスクインターフェース
+```typescript
+interface Task {
+  id: string;
+  title: string;
+  description: string;
+  status: 'todo' | 'in_progress' | 'completed';
+  priority: 'low' | 'medium' | 'high';
+  createdAt: Date;
+  updatedAt: Date;
+}
+```
+
+### 2.2 Cosmos DB用タスクモデル
 ```typescript
 interface CosmosTask {
   id: string;
@@ -28,14 +43,14 @@ interface CosmosTask {
   description: string;
   status: 'todo' | 'in_progress' | 'completed';
   priority: 'low' | 'medium' | 'high';
-  createdAt: string;  // ISO 8601 形式
-  updatedAt: string;  // ISO 8601 形式
+  createdAt: string;  // ISO 8601形式
+  updatedAt: string;  // ISO 8601形式
   type: 'task';       // ドキュメント種別識別用
-  _partitionKey: string; // partitionKey用（idと同じ値）
+  _partitionKey: string; // パーティションキー
 }
 ```
 
-## 3. API実装
+## 3. データアクセス層実装
 
 ### 3.1 Cosmos DBクライアントセットアップ
 ```typescript
@@ -49,21 +64,61 @@ const container = database.container(process.env.AZURE_COSMOS_CONTAINER_NAME!);
 export { container };
 ```
 
-### 3.2 APIルート実装
+### 3.2 データアクセスヘルパー
+```typescript
+// lib/cosmosHelpers.ts
+import { container } from './cosmosdb';
+import { CosmosTask, Task } from './types';
 
-#### タスク取得 (GET /api/tasks)
+export const cosmosHelpers = {
+  // Cosmos DBモデルからアプリケーションモデルへの変換
+  toTask(cosmosTask: CosmosTask): Task {
+    const { _partitionKey, type, ...rest } = cosmosTask;
+    return {
+      ...rest,
+      createdAt: new Date(cosmosTask.createdAt),
+      updatedAt: new Date(cosmosTask.updatedAt)
+    };
+  },
+
+  // アプリケーションモデルからCosmos DBモデルへの変換
+  toCosmosTask(task: Partial<Task>, id?: string): Partial<CosmosTask> {
+    const taskId = id || crypto.randomUUID();
+    return {
+      ...task,
+      id: taskId,
+      _partitionKey: taskId,
+      type: 'task',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+  },
+
+  // クエリ結果の変換
+  async queryTasks(query: string): Promise<Task[]> {
+    const { resources } = await container.items
+      .query<CosmosTask>(query)
+      .fetchAll();
+    return resources.map(this.toTask);
+  }
+};
+```
+
+## 4. APIルート実装
+
+### 4.1 タスク一覧取得
 ```typescript
 // app/api/tasks/route.ts
 import { container } from '@/lib/cosmosdb';
+import { cosmosHelpers } from '@/lib/cosmosHelpers';
 import { NextResponse } from 'next/server';
 
 export async function GET() {
   try {
-    const { resources } = await container.items
-      .query('SELECT * FROM c WHERE c.type = "task" ORDER BY c.createdAt DESC')
-      .fetchAll();
-
-    return NextResponse.json({ tasks: resources });
+    const tasks = await cosmosHelpers.queryTasks(
+      'SELECT * FROM c WHERE c.type = "task" ORDER BY c.createdAt DESC'
+    );
+    return NextResponse.json({ tasks });
   } catch (error) {
     return NextResponse.json(
       { error: 'Failed to fetch tasks' },
@@ -73,25 +128,14 @@ export async function GET() {
 }
 ```
 
-#### タスク作成 (POST /api/tasks)
+### 4.2 タスク作成
 ```typescript
-// app/api/tasks/route.ts
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const taskId = crypto.randomUUID();
-
-    const task: CosmosTask = {
-      id: taskId,
-      _partitionKey: taskId,
-      type: 'task',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      ...body
-    };
-
-    const { resource } = await container.items.create(task);
-    return NextResponse.json(resource);
+    const cosmosTask = cosmosHelpers.toCosmosTask(body);
+    const { resource } = await container.items.create(cosmosTask);
+    return NextResponse.json(cosmosHelpers.toTask(resource));
   } catch (error) {
     return NextResponse.json(
       { error: 'Failed to create task' },
@@ -101,106 +145,9 @@ export async function POST(request: Request) {
 }
 ```
 
-#### タスク更新 (PATCH /api/tasks/[id])
-```typescript
-// app/api/tasks/[id]/route.ts
-export async function PATCH(
-  request: Request,
-  { params }: { params: { id: string } }
-) {
-  try {
-    const body = await request.json();
-    const { resource } = await container.item(params.id, params.id)
-      .replace({
-        ...body,
-        id: params.id,
-        _partitionKey: params.id,
-        updatedAt: new Date().toISOString()
-      });
+## 5. パフォーマンス最適化
 
-    return NextResponse.json(resource);
-  } catch (error) {
-    return NextResponse.json(
-      { error: 'Failed to update task' },
-      { status: 500 }
-    );
-  }
-}
-```
-
-#### タスク削除 (DELETE /api/tasks/[id])
-```typescript
-// app/api/tasks/[id]/route.ts
-export async function DELETE(
-  request: Request,
-  { params }: { params: { id: string } }
-) {
-  try {
-    await container.item(params.id, params.id).delete();
-    return new NextResponse(null, { status: 204 });
-  } catch (error) {
-    return NextResponse.json(
-      { error: 'Failed to delete task' },
-      { status: 500 }
-    );
-  }
-}
-```
-
-## 4. クライアント側の更新
-
-### 4.1 API Clientの更新
-```typescript
-// lib/api.ts
-import { Task } from './types';
-
-export const api = {
-  async getTasks(): Promise<Task[]> {
-    const response = await fetch('/api/tasks');
-    if (!response.ok) {
-      throw new Error('Failed to fetch tasks');
-    }
-    const data = await response.json();
-    return data.tasks.map((task: any) => ({
-      ...task,
-      createdAt: new Date(task.createdAt),
-      updatedAt: new Date(task.updatedAt)
-    }));
-  },
-
-  async createTask(task: Omit<Task, 'id' | 'createdAt' | 'updatedAt'>): Promise<Task> {
-    const response = await fetch('/api/tasks', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(task)
-    });
-    if (!response.ok) {
-      throw new Error('Failed to create task');
-    }
-    const data = await response.json();
-    return {
-      ...data,
-      createdAt: new Date(data.createdAt),
-      updatedAt: new Date(data.updatedAt)
-    };
-  },
-
-  // 他のメソッドも同様に更新
-};
-```
-
-## 5. セットアップ手順
-
-1. Azure Portalで新しいCosmos DBアカウントを作成
-2. データベースとコンテナを作成
-3. 必要な環境変数を設定
-4. 依存パッケージのインストール:
-```bash
-npm install @azure/cosmos
-```
-
-## 6. インデックス設定
-
+### 5.1 インデックス設定
 ```json
 {
   "indexingMode": "consistent",
@@ -214,19 +161,31 @@ npm install @azure/cosmos
     {
       "path": "/description/?"
     }
+  ],
+  "compositeIndexes": [
+    [
+      {
+        "path": "/type",
+        "order": "ascending"
+      },
+      {
+        "path": "/createdAt",
+        "order": "descending"
+      }
+    ]
   ]
 }
 ```
 
-## 7. パフォーマンス最適化
+### 5.2 クエリ最適化戦略
+1. パーティションキーの効率的な使用
+2. 複合インデックスの活用
+3. プロジェクション最適化
+4. ページネーションの実装
 
-1. クエリのパーティションキー利用
-2. インデックスの最適化
-3. 適切なRU/s設定
-4. キャッシュ戦略の実装
+## 6. エラーハンドリング
 
-## 8. エラーハンドリング
-
+### 6.1 カスタムエラークラス
 ```typescript
 class CosmosDBError extends Error {
   constructor(
@@ -238,14 +197,91 @@ class CosmosDBError extends Error {
     this.name = 'CosmosDBError';
   }
 }
-
-// エラーハンドリング例
-try {
-  await container.items.create(task);
-} catch (error) {
-  if (error.code === 409) {
-    throw new CosmosDBError('タスクが既に存在します', 409, 'TASK_EXISTS');
-  }
-  throw new CosmosDBError('タスクの作成に失敗しました', 500);
-}
 ```
+
+### 6.2 エラーハンドリングパターン
+```typescript
+// lib/errorHandling.ts
+export const handleCosmosError = (error: any) => {
+  if (error.code === 409) {
+    return new CosmosDBError(
+      'Document already exists',
+      409,
+      'DOCUMENT_EXISTS'
+    );
+  }
+  if (error.code === 404) {
+    return new CosmosDBError(
+      'Document not found',
+      404,
+      'DOCUMENT_NOT_FOUND'
+    );
+  }
+  return new CosmosDBError(
+    'Internal server error',
+    500,
+    'INTERNAL_ERROR'
+  );
+};
+```
+
+## 7. テスト実装
+
+### 7.1 Cosmos DBモック
+```typescript
+// __mocks__/@azure/cosmos.ts
+export const mockContainer = {
+  items: {
+    create: jest.fn(),
+    upsert: jest.fn(),
+    query: jest.fn().mockReturnValue({
+      fetchAll: jest.fn().mockResolvedValue({ resources: [] })
+    }),
+    delete: jest.fn(),
+    item: jest.fn().mockReturnValue({
+      delete: jest.fn(),
+      replace: jest.fn(),
+      read: jest.fn()
+    })
+  }
+};
+
+export const CosmosClient = jest.fn().mockImplementation(() => ({
+  database: jest.fn().mockReturnValue({
+    container: jest.fn().mockReturnValue(mockContainer)
+  })
+}));
+
+// テスト実装例
+describe('Cosmos DB Integration', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  test('タスクの作成', async () => {
+    const task = {
+      title: 'テストタスク',
+      description: '説明',
+      priority: 'high'
+    };
+
+    mockContainer.items.create.mockResolvedValueOnce({
+      resource: {
+        ...task,
+        id: '123',
+        _partitionKey: '123',
+        type: 'task',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      }
+    });
+
+    const response = await fetch('/api/tasks', {
+      method: 'POST',
+      body: JSON.stringify(task)
+    });
+
+    expect(response.status).toBe(200);
+    expect(mockContainer.items.create).toHaveBeenCalled();
+  });
+});

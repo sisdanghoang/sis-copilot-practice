@@ -2,35 +2,62 @@
 
 ## アーキテクチャ概要
 
+### システム構成
+- フロントエンド: Next.js 14 (App Router)
+- データベース: Azure Cosmos DB
+- 認証: Azure AD B2C (予定)
+
 ### フロントエンド構成
 1. **ページ構成**
-```
-app/
-├── page.tsx (ダッシュボード)
-├── tasks/
-│   ├── page.tsx (タスク一覧)
-│   ├── [id]/
-│   │   └── page.tsx (タスク詳細)
-```
+   ```
+   app/
+   ├── page.tsx (ダッシュボード)
+   ├── tasks/
+   │   ├── page.tsx (タスク一覧)
+   │   ├── [id]/
+   │   │   └── page.tsx (タスク詳細)
+   ```
 
 2. **コンポーネント設計**
-```
-components/
-├── TaskCard.tsx (タスク表示カード)
-├── TaskList.tsx (タスク一覧表示)
-├── TaskForm.tsx (タスク作成/編集フォーム)
-└── ui/ (Shadcn/uiコンポーネント)
-```
+   ```
+   components/
+   ├── TaskCard.tsx (タスク表示カード)
+   ├── TaskList.tsx (タスク一覧表示)
+   ├── TaskForm.tsx (タスク作成/編集フォーム)
+   └── ui/ (Shadcn/uiコンポーネント)
+   ```
 
 3. **状態管理**
-- React Query によるサーバーステート管理
-- Zod によるデータバリデーション
-- ローカルステート最小化
+   - React Query によるサーバーステート管理
+   - Zod によるデータバリデーション
+   - ローカルステート最小化
 
-### データモデル
+### バックエンド構成
 
-#### タスク (Task)
+#### 1. Cosmos DB設定
 ```typescript
+// lib/cosmosdb.ts
+const config = {
+  databaseName: "taskflow-db",
+  containerId: "tasks",
+  partitionKey: "/id"
+};
+```
+
+#### 2. API層
+```
+app/api/
+├── tasks/
+│   ├── route.ts (GET, POST)
+│   └── [id]/
+│       └── route.ts (PATCH, DELETE)
+```
+
+## データモデル
+
+### タスクモデル
+```typescript
+// lib/types.ts
 interface Task {
   id: string;
   title: string;
@@ -40,43 +67,77 @@ interface Task {
   createdAt: Date;
   updatedAt: Date;
 }
+
+// Cosmos DB用拡張モデル
+interface CosmosTask extends Omit<Task, 'createdAt' | 'updatedAt'> {
+  createdAt: string;  // ISO 8601形式
+  updatedAt: string;  // ISO 8601形式
+  type: 'task';       // ドキュメント種別識別用
+  _partitionKey: string; // パーティションキー（idと同値）
+}
 ```
 
-### API設計
+## API設計
 
-#### エンドポイント
-1. タスク取得
-```
+### エンドポイント仕様
+
+#### 1. タスク一覧取得
+```typescript
 GET /api/tasks
-GET /api/tasks/:id
+
+// レスポンス
+{
+  tasks: Task[]
+}
 ```
 
-2. タスク作成
+#### 2. タスク取得
+```typescript
+GET /api/tasks/:id
+
+// レスポンス
+Task
 ```
+
+#### 3. タスク作成
+```typescript
 POST /api/tasks
 Content-Type: application/json
 
+// リクエストボディ
 {
-  "title": string,
-  "description": string,
-  "priority": "low" | "medium" | "high"
+  title: string;
+  description: string;
+  priority: 'low' | 'medium' | 'high';
 }
+
+// レスポンス
+Task
 ```
 
-3. タスク更新
-```
+#### 4. タスク更新
+```typescript
 PATCH /api/tasks/:id
 Content-Type: application/json
 
+// リクエストボディ
 {
-  "status": "todo" | "in_progress" | "completed",
-  "priority": "low" | "medium" | "high"
+  status?: 'todo' | 'in_progress' | 'completed';
+  priority?: 'low' | 'medium' | 'high';
+  title?: string;
+  description?: string;
 }
+
+// レスポンス
+Task
 ```
 
-4. タスク削除
-```
+#### 5. タスク削除
+```typescript
 DELETE /api/tasks/:id
+
+// レスポンス
+204 No Content
 ```
 
 ## 実装詳細
@@ -91,72 +152,109 @@ DELETE /api/tasks/:id
 
 #### TaskList
 - タスクのリスト表示
+- React Queryを使用したデータフェッチ
 - フィルタリング機能
 - ソート機能
 - ページネーション
 
 #### TaskForm
 - タスクの作成/編集フォーム
-- バリデーション
+- Zodによるバリデーション
 - エラーハンドリング
-- 非同期送信処理
+- React Queryによる非同期処理
 
-### パフォーマンス最適化
+### データアクセス層
 
-1. **レンダリング最適化**
-- React.memo の活用
-- useMemo/useCallback の適切な使用
-- 仮想スクロールの実装
+#### Cosmos DBクライアント
+```typescript
+import { CosmosClient } from '@azure/cosmos';
 
-2. **データ取得最適化**
-- React Query によるキャッシュ管理
-- 適切なプリフェッチ
-- ページネーションの実装
+const client = new CosmosClient(process.env.AZURE_COSMOS_CONNECTION_STRING!);
+const database = client.database(process.env.AZURE_COSMOS_DATABASE_NAME!);
+const container = database.container(process.env.AZURE_COSMOS_CONTAINER_NAME!);
 
-3. **バンドルサイズ最適化**
-- コンポーネントの動的インポート
-- 必要最小限のライブラリ使用
-- Tree-shaking の活用
+export { container };
+```
+
+#### クエリ最適化
+1. インデックス設定
+```json
+{
+  "indexingMode": "consistent",
+  "automatic": true,
+  "includedPaths": [
+    {
+      "path": "/*"
+    }
+  ],
+  "excludedPaths": [
+    {
+      "path": "/description/?"
+    }
+  ]
+}
+```
+
+2. パーティションキー戦略
+- タスクIDをパーティションキーとして使用
+- 単一タスクの読み取り/更新を効率化
 
 ### エラーハンドリング
 
-1. **フロントエンド**
+#### カスタムエラークラス
 ```typescript
-try {
-  await api.updateTask(id, newStatus);
-} catch (error) {
-  if (error instanceof APIError) {
-    // エラーメッセージの表示
-    showError(error.message);
+class APIError extends Error {
+  constructor(
+    public status: number,
+    message: string,
+    public code?: string
+  ) {
+    super(message);
+    this.name = 'APIError';
   }
 }
 ```
 
-2. **API**
+#### エラー処理パターン
 ```typescript
-if (!response.ok) {
-  throw new APIError(response.status, 'タスクの更新に失敗しました');
+try {
+  const { resource } = await container.items.create(task);
+  return NextResponse.json(resource);
+} catch (error) {
+  if (error.code === 409) {
+    return NextResponse.json(
+      { error: 'タスクが既に存在します' },
+      { status: 409 }
+    );
+  }
+  return NextResponse.json(
+    { error: 'タスクの作成に失敗しました' },
+    { status: 500 }
+  );
 }
 ```
 
-### セキュリティ対策
+## パフォーマンス最適化
 
-1. **入力バリデーション**
-- Zod によるスキーマ検証
-- XSS対策
-- SQLインジェクション対策
+### 1. フロントエンド
+- React Query によるキャッシュ管理
+- コンポーネントのメモ化
+- 画像の最適化
+- Code Splitting
 
-2. **認証/認可**
-- JWTトークンの使用
-- CSRF対策
-- Rate Limiting
+### 2. バックエンド
+- Cosmos DB クエリの最適化
+- 適切なパーティション戦略
+- インデックスの最適化
+- キャッシュ戦略の実装
 
 ## 開発環境設定
 
 ### 必要な環境変数
 ```env
-NEXT_PUBLIC_API_URL=http://localhost:3000/api
-NEXT_PUBLIC_MAX_TASKS_PER_PAGE=20
+AZURE_COSMOS_CONNECTION_STRING=your_connection_string
+AZURE_COSMOS_DATABASE_NAME=taskflow-db
+AZURE_COSMOS_CONTAINER_NAME=tasks
 ```
 
 ### 開発コマンド
