@@ -1,5 +1,5 @@
 import { getTasks,createTask } from '@/lib/cosmosHelpers';
-import { TaskSchema } from '@/lib/types';
+import { Task,  } from '@/lib/types';
 import { NextResponse } from 'next/server';
 
 export async function GET() {
@@ -13,9 +13,9 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
-    const validatedBody = TaskSchema.parse(body);
-    const newTask = await createTask(validatedBody);
+    const body: Task = await request.json();
+    console.log('body:', body);
+    const newTask = await createTask(body);
     return NextResponse.json(newTask, { status: 201 });
   } catch (error) {
     return NextResponse.json({ error: 'Failed to create task', details: error }, { status: 400 });

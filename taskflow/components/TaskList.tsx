@@ -19,9 +19,9 @@ const TaskList = () => {
   }
 
   return (
-    <div className="task-list">
+    <div className="task-list space-y-4">
       {tasks.map(task => (
-        <TaskCard key={task.id} task={task} />
+        <TaskCard key={task.id} task={{...task, dueDate: new Date(task.dueDate)}} />
       ))}
     </div>
   );

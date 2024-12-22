@@ -5,7 +5,7 @@ export interface Task {
   id: string;
   title: string;
   description: string;
-  status: 'todo' | 'in_progress' | 'completed';
+  status: 'not_started' | 'in_progress' | 'completed';
   priority: 'low' | 'medium' | 'high';
   dueDate: Date;
   createdAt: Date;
@@ -17,11 +17,11 @@ export interface CosmosTask {
   id: string;
   title: string;
   description: string;
-  status: 'todo' | 'in_progress' | 'completed';
+  status: 'not_started' | 'in_progress' | 'completed';
   priority: 'low' | 'medium' | 'high';
   dueDate: Date;
-  createdAt: string;  // ISO 8601形式
-  updatedAt: string;  // ISO 8601形式
+  createdAt: Date;  // ISO 8601形式
+  updatedAt: Date;  // ISO 8601形式
   type: 'task';       // ドキュメント種別識別用
   _partitionKey: string; // パーティションキー
 }
@@ -29,24 +29,33 @@ export interface CosmosTask {
 // TaskモデルのZodスキーマ
 export const TaskSchema = z.object({
   id: z.string(),
-  title: z.string(),
-  description: z.string(),
-  status: z.enum(['todo', 'in_progress', 'completed']),
+  title: z.string().min(1, 'title is required'),
+  description: z.string().min(1, 'description is required'),
+  status: z.enum(['not_started', 'in_progress', 'completed']),
   priority: z.enum(['low', 'medium', 'high']),
   dueDate: z.date(),
   createdAt: z.date(),
   updatedAt: z.date()
 });
 
+export const TaskFormSchema = z.object({
+  title: z.string().min(1, 'title is required'),
+  description: z.string().min(1, 'description is required'),
+  status: z.enum(['not_started', 'in_progress', 'completed']),
+  priority: z.enum(['low', 'medium', 'high']),
+  dueDate: z.union([z.string(), z.date()]).optional(),
+});
+
+export type TaskFormValues = z.infer<typeof TaskFormSchema>;
 
 // CosmosTaskモデルのZodスキーマ
 export const CosmosTaskSchema = z.object({
   id: z.string(),
   title: z.string(),
   description: z.string().optional(),
-  status: z.enum(['todo', 'in_progress', 'completed']),
+  status: z.enum(['not_started', 'in_progress', 'completed']),
   priority: z.enum(['low', 'medium', 'high']),
-  dueDate: z.date(),
+  dueDate: z.string(),
   createdAt: z.date(),
   updatedAt: z.date(),
   _partitionKey: z.string()

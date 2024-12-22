@@ -14,7 +14,7 @@ const createTask = async (task: Task) : Promise<Task|void>=> {
 };
 
 const updateTask = async (task: Task) : Promise<Task|void>=>  {
-    const { data } = await axios.patch(`/api/tasks/${task.id}`, { status: task.status });
+    const { data } = await axios.patch(`/api/tasks/${task.id}`, task);
     return data;
 };
 

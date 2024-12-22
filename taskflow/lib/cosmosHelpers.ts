@@ -21,8 +21,8 @@ export const toCosmosTask = (task: Task): CosmosTask => ({
   status: task.status,
   priority: task.priority,
   dueDate: task.dueDate,
-  createdAt: task.createdAt.toISOString(),
-  updatedAt: task.updatedAt.toISOString(),
+  createdAt: task.createdAt,
+  updatedAt: task.updatedAt,
   type: 'task',
   _partitionKey: task.id
 });
@@ -31,6 +31,7 @@ export const toCosmosTask = (task: Task): CosmosTask => ({
 export const getTasks = async (): Promise<Task[]> => {
   try {
     const { resources } = await container.items.query("SELECT * from c where c.dueDate >= '2024-11-20'").fetchAll();
+    console.log(resources.map(toTask));
     return resources.map(toTask);
   } catch (error) {
     throw handleCosmosError(error);
