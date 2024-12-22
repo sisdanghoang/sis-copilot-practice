@@ -44,9 +44,10 @@
    ```typescript
    test('ステータス変更が正しく動作すること', async () => {
      const onStatusChange = jest.fn();
+     const task = { id: '1', title: 'テストタスク', description: '説明文', status: 'todo', priority: 'high' }; // Define task here
      render(<TaskCard task={task} onStatusChange={onStatusChange} />);
 
-     await userEvent.click(screen.getByText('開始'));
+     await userEvent.click(screen.getByRole('button', { name: '開始' })); // Assuming a button with "開始" text/label
      expect(onStatusChange).toHaveBeenCalledWith('1', 'in_progress');
    });
    ```
@@ -55,9 +56,10 @@
    ```typescript
    test('削除ボタンが正しく動作すること', async () => {
      const onDelete = jest.fn();
+     const task = { id: '1', title: 'テストタスク', description: '説明文', status: 'todo', priority: 'high' }; // Define task here
      render(<TaskCard task={task} onDelete={onDelete} />);
 
-     await userEvent.click(screen.getByText('削除'));
+     await userEvent.click(screen.getByRole('button', { name: '削除' })); // Assuming a button with "削除" text/label
      expect(onDelete).toHaveBeenCalledWith('1');
    });
    ```
@@ -68,8 +70,11 @@
 1. **タスク取得テスト**
    ```typescript
    test('タスク一覧を正しく取得できること', async () => {
-     const mockTasks = [/* タスクデータ */];
-     fetchMock.mockResponseOnce(JSON.stringify({ tasks: mockTasks }));
+     const mockTasks = [{ id: '1', title: 'タスク1', description: '説明', status: 'todo', priority: 'low' }]; // Example task data
+     global.fetch = jest.fn().mockResolvedValueOnce({
+       json: async () => ({ tasks: mockTasks }),
+       ok: true,
+     });
 
      const result = await api.getTasks();
      expect(result).toEqual(mockTasks);
@@ -79,7 +84,7 @@
 2. **エラーハンドリングテスト**
    ```typescript
    test('APIエラーが適切にハンドリングされること', async () => {
-     fetchMock.mockRejectOnce(new Error('API Error'));
+     global.fetch = jest.fn().mockRejectedValueOnce(new Error('API Error'));
 
      await expect(api.getTasks()).rejects.toThrow('API Error');
    });
@@ -93,11 +98,11 @@
    ```typescript
    test('新規タスクを作成できること', async ({ page }) => {
      await page.goto('/tasks');
-     await page.click('button:has-text("新規タスク")');
-     await page.fill('[name="title"]', 'テストタスク');
-     await page.fill('[name="description"]', '説明文');
-     await page.selectOption('[name="priority"]', 'high');
-     await page.click('button:has-text("保存")');
+     await page.getByRole('button', { name: '新規タスク' }).click();
+     await page.locator('[name="title"]').fill('テストタスク');
+     await page.locator('[name="description"]').fill('説明文');
+     await page.locator('[name="priority"]').selectOption('high');
+     await page.getByRole('button', { name: '保存' }).click();
 
      await expect(page.locator('text=テストタスク')).toBeVisible();
    });
@@ -106,10 +111,11 @@
 2. **タスク編集フロー**
    ```typescript
    test('既存タスクを編集できること', async ({ page }) => {
+     // Assuming a task with id '1' exists for editing
      await page.goto('/tasks/1');
-     await page.click('button:has-text("編集")');
-     await page.fill('[name="title"]', '更新後のタイトル');
-     await page.click('button:has-text("保存")');
+     await page.getByRole('button', { name: '編集' }).click();
+     await page.locator('[name="title"]').fill('更新後のタイトル');
+     await page.getByRole('button', { name: '保存' }).click();
 
      await expect(page.locator('text=更新後のタイトル')).toBeVisible();
    });
@@ -119,8 +125,9 @@
    ```typescript
    test('優先度でフィルタリングできること', async ({ page }) => {
      await page.goto('/tasks');
-     await page.selectOption('[data-testid="priority-filter"]', 'high');
+     await page.locator('[data-testid="priority-filter"]').selectOption('high');
 
+     // Adjust the locator based on how priority is displayed in the UI
      await expect(page.locator('[data-priority="high"]')).toHaveCount(3);
    });
    ```

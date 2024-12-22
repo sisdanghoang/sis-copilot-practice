@@ -77,68 +77,102 @@ interface CosmosTask extends Omit<Task, 'createdAt' | 'updatedAt'> {
 }
 ```
 
-## API設計
+## API デザイン
 
-### エンドポイント仕様
+### エンドポイント一覧
+#### タスク
 
-#### 1. タスク一覧取得
+- **タスク作成**: `POST /api/tasks`
+  - リクエストボディ:
+    ```json
+    {
+      "title": "string",
+      "description": "string",
+      "status": "todo" | "in_progress" | "completed",
+      "priority": "low" | "medium" | "high"
+    }
+    ```
+  - レスポンス:
+    ```json
+    {
+      "id": "string (UUID)",
+      "title": "string",
+      "description": "string",
+      "status": "todo" | "in_progress" | "completed",
+      "priority": "low" | "medium" | "high",
+      "createdAt": "string (ISO 8601)",
+      "updatedAt": "string (ISO 8601)"
+    }
+    ```
+
+- **タスク取得 (単一)**: `GET /api/tasks/{id}`
+  - レスポンス: 上記タスク作成と同じ
+
+- **タスク取得 (全件)**: `GET /api/tasks`
+  - レスポンス:
+    ```json
+    [
+      {
+        "id": "string (UUID)",
+        "title": "string",
+        "description": "string",
+        "status": "todo" | "in_progress" | "completed",
+        "priority": "low" | "medium" | "high",
+        "createdAt": "string (ISO 8601)",
+        "updatedAt": "string (ISO 8601)"
+      }
+      // ... more tasks
+    ]
+    ```
+
+- **タスク更新**: `PATCH /api/tasks/{id}`
+  - リクエストボディ: 更新したいフィールドのみを含む
+    ```json
+    {
+      "title": "string",
+      "description": "string",
+      "status": "todo" | "in_progress" | "completed",
+      "priority": "low" | "medium" | "high"
+    }
+    ```
+  - レスポンス: 上記タスク作成と同じ
+
+- **タスク削除**: `DELETE /api/tasks/{id}`
+  - レスポンス:
+    ```json
+    {
+      "message": "Task deleted successfully"
+    }
+    ```
+
+### データモデル
+
+#### Task
 ```typescript
-GET /api/tasks
-
-// レスポンス
-{
-  tasks: Task[]
-}
-```
-
-#### 2. タスク取得
-```typescript
-GET /api/tasks/:id
-
-// レスポンス
-Task
-```
-
-#### 3. タスク作成
-```typescript
-POST /api/tasks
-Content-Type: application/json
-
-// リクエストボディ
-{
+interface Task {
+  id: string;
   title: string;
   description: string;
+  status: 'todo' | 'in_progress' | 'completed';
   priority: 'low' | 'medium' | 'high';
+  createdAt: string; // ISO 8601
+  updatedAt: string; // ISO 8601
 }
-
-// レスポンス
-Task
 ```
 
-#### 4. タスク更新
-```typescript
-PATCH /api/tasks/:id
-Content-Type: application/json
+### 認証
 
-// リクエストボディ
-{
-  status?: 'todo' | 'in_progress' | 'completed';
-  priority?: 'low' | 'medium' | 'high';
-  title?: string;
-  description?: string;
-}
+APIへのアクセスには認証が必要です。具体的な認証方法は後日決定します。
 
-// レスポンス
-Task
-```
+### エラーハンドリング
 
-#### 5. タスク削除
-```typescript
-DELETE /api/tasks/:id
-
-// レスポンス
-204 No Content
-```
+APIは標準的なHTTPステータスコードを返します。
+- 200 OK: 成功
+- 201 Created: 作成成功
+- 204 No Content: 削除成功
+- 400 Bad Request: リクエストが不正
+- 404 Not Found: リソースが見つからない
+- 500 Internal Server Error: サーバーエラー
 
 ## 実装詳細
 

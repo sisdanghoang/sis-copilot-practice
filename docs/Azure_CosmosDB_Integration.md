@@ -262,7 +262,8 @@ describe('Cosmos DB Integration', () => {
     const task = {
       title: 'テストタスク',
       description: '説明',
-      priority: 'high'
+      priority: 'high',
+      status: 'todo' // Added status for consistency
     };
 
     mockContainer.items.create.mockResolvedValueOnce({
