@@ -7,6 +7,7 @@ export interface Task {
   description: string;
   status: 'todo' | 'in_progress' | 'completed';
   priority: 'low' | 'medium' | 'high';
+  dueDate: Date;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -18,6 +19,7 @@ export interface CosmosTask {
   description: string;
   status: 'todo' | 'in_progress' | 'completed';
   priority: 'low' | 'medium' | 'high';
+  dueDate: Date;
   createdAt: string;  // ISO 8601形式
   updatedAt: string;  // ISO 8601形式
   type: 'task';       // ドキュメント種別識別用
@@ -31,6 +33,7 @@ export const TaskSchema = z.object({
   description: z.string(),
   status: z.enum(['todo', 'in_progress', 'completed']),
   priority: z.enum(['low', 'medium', 'high']),
+  dueDate: z.date(),
   createdAt: z.date(),
   updatedAt: z.date()
 });
@@ -43,6 +46,7 @@ export const CosmosTaskSchema = z.object({
   description: z.string().optional(),
   status: z.enum(['todo', 'in_progress', 'completed']),
   priority: z.enum(['low', 'medium', 'high']),
+  dueDate: z.date(),
   createdAt: z.date(),
   updatedAt: z.date(),
   _partitionKey: z.string()

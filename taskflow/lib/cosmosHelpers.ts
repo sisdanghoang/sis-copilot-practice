@@ -9,6 +9,7 @@ export const toTask = (cosmosTask: CosmosTask): Task => ({
   description: cosmosTask.description,
   status: cosmosTask.status,
   priority: cosmosTask.priority,
+  dueDate: cosmosTask.dueDate,
   createdAt: new Date(cosmosTask.createdAt),
   updatedAt: new Date(cosmosTask.updatedAt)
 });
@@ -19,6 +20,7 @@ export const toCosmosTask = (task: Task): CosmosTask => ({
   description: task.description,
   status: task.status,
   priority: task.priority,
+  dueDate: task.dueDate,
   createdAt: task.createdAt.toISOString(),
   updatedAt: task.updatedAt.toISOString(),
   type: 'task',
