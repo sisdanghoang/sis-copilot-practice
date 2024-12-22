@@ -1,0 +1,10 @@
+## Sis-copilot custom:
+.sis-copilot/
+.git
+
+venv
+env
+node_modules
+build
+out
+
