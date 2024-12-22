@@ -30,7 +30,7 @@
        id: '1',
        title: 'テストタスク',
        description: '説明文',
-       status: 'todo',
+       status: 'not_started',
        priority: 'high'
      };
      render(<TaskCard task={task} />);
@@ -44,7 +44,7 @@
    ```typescript
    test('ステータス変更が正しく動作すること', async () => {
      const onStatusChange = jest.fn();
-     const task = { id: '1', title: 'テストタスク', description: '説明文', status: 'todo', priority: 'high' }; // Define task here
+     const task = { id: '1', title: 'テストタスク', description: '説明文', status: 'not_started', priority: 'high' }; // Define task here
      render(<TaskCard task={task} onStatusChange={onStatusChange} />);
 
      await userEvent.click(screen.getByRole('button', { name: '開始' })); // Assuming a button with "開始" text/label
@@ -56,7 +56,7 @@
    ```typescript
    test('削除ボタンが正しく動作すること', async () => {
      const onDelete = jest.fn();
-     const task = { id: '1', title: 'テストタスク', description: '説明文', status: 'todo', priority: 'high' }; // Define task here
+     const task = { id: '1', title: 'テストタスク', description: '説明文', status: 'not_started', priority: 'high' }; // Define task here
      render(<TaskCard task={task} onDelete={onDelete} />);
 
      await userEvent.click(screen.getByRole('button', { name: '削除' })); // Assuming a button with "削除" text/label
@@ -70,7 +70,7 @@
 1. **タスク取得テスト**
    ```typescript
    test('タスク一覧を正しく取得できること', async () => {
-     const mockTasks = [{ id: '1', title: 'タスク1', description: '説明', status: 'todo', priority: 'low' }]; // Example task data
+     const mockTasks = [{ id: '1', title: 'タスク1', description: '説明', status: 'not_started', priority: 'low' }]; // Example task data
      global.fetch = jest.fn().mockResolvedValueOnce({
        json: async () => ({ tasks: mockTasks }),
        ok: true,
@@ -89,6 +89,7 @@
      await expect(api.getTasks()).rejects.toThrow('API Error');
    });
    ```
+
 3. Unit Test for API Route
 ```typescript
 // __tests__/api/tasks.test.ts
@@ -106,7 +107,7 @@ describe('Tasks API', () => {
 
   describe('GET /api/tasks', () => {
     it('should return a list of tasks', async () => {
-      const mockTasks = [{ id: '1', title: 'Test Task', description: '', status: 'todo', priority: 'medium', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }];
+      const mockTasks = [{ id: '1', title: 'Test Task', description: '', status: 'not_started', priority: 'medium', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }];
       (cosmosHelpers.getTasks as jest.Mock).mockResolvedValue(mockTasks);
 
       const response = await GET();
@@ -128,7 +129,7 @@ describe('Tasks API', () => {
 
   describe('POST /api/tasks', () => {
     it('should create a new task', async () => {
-      const newTaskPayload = { title: 'New Task', description: 'Description', status: 'todo', priority: 'low' };
+      const newTaskPayload = { title: 'New Task', description: 'Description', status: 'not_started', priority: 'low' };
       const createdTask = { id: '2', ...newTaskPayload, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
       (cosmosHelpers.createTask as jest.Mock).mockResolvedValue(createdTask);
 

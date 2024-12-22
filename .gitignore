@@ -9,5 +9,6 @@ build
 out
 
 docs/demo
-taskflow/.next/
-**/.next/*
+# Ignore the .next folder in the root and any subdirectories
+/.next/
+**/.next/

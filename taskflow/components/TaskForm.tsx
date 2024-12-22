@@ -2,8 +2,8 @@
 import React from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import useTasks from "@/hooks/useTasks";
-import { TaskFormSchema, TaskFormValues  } from "@/lib/types";
+import useTasks from "../hooks/useTasks";
+import { TaskFormSchema, TaskFormValues  } from "../lib/types";
 
 interface TaskFormProps {
   initialValues?: TaskFormValues;

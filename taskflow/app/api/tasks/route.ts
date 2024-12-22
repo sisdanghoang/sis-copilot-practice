@@ -1,5 +1,5 @@
-import { getTasks,createTask } from '@/lib/cosmosHelpers';
-import { Task,  } from '@/lib/types';
+import { getTasks,createTask } from '../../../lib/cosmosHelpers';
+import { Task,  } from '../../../lib/types';
 import { NextResponse } from 'next/server';
 
 export async function GET() {

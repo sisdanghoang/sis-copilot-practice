@@ -1,5 +1,5 @@
-import { getTask, updateTask, deleteTask } from '@/lib/cosmosHelpers';
-import { Task } from '@/lib/types';
+import { getTask, updateTask, deleteTask } from '../../../../lib/cosmosHelpers';
+import { Task } from '../../../../lib/types';
 import { NextResponse } from 'next/server';
 
 type PathParams = { params: { id: string } };
@@ -20,9 +20,7 @@ export async function GET(request: Request, { params }: PathParams) {
 export async function PATCH(request: Request, { params }: PathParams) {
   const { id } = await params;
   try {
-    console.log('id:', id);
     const body:Task = await request.json();
-    console.log('body:', body);
     //const updates = TaskSchema.parse(body);
     const updatedTask = await updateTask(id, body);
     if (!updatedTask) {
