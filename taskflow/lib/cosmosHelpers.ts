@@ -30,7 +30,7 @@ export const toCosmosTask = (task: Task): CosmosTask => ({
 // CRUD操作関数
 export const getTasks = async (): Promise<Task[]> => {
   try {
-    const { resources } = await container.items.query("SELECT * from c").fetchAll();
+    const { resources } = await container.items.query("SELECT * from c where c.dueDate >= '2024-11-20'").fetchAll();
     return resources.map(toTask);
   } catch (error) {
     throw handleCosmosError(error);
