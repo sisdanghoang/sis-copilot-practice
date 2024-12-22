@@ -1,5 +1,6 @@
+"use client"
 import React from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm } from "react-hook-form";
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import useTasks from '@/hooks/useTasks';
@@ -10,10 +11,9 @@ type TaskFormValues = z.infer<typeof TaskSchema>;
 interface TaskFormProps {
   initialValues?: TaskFormValues;
   taskId?: string;
-  onSuccess: () => void;
 }
 
-const TaskForm: React.FC<TaskFormProps> = ({ initialValues, taskId, onSuccess }) => {
+const TaskForm: React.FC<TaskFormProps> = ({ initialValues, taskId }) => {
   const { createTask, updateTask } = useTasks();
   const {
     register,
@@ -24,14 +24,17 @@ const TaskForm: React.FC<TaskFormProps> = ({ initialValues, taskId, onSuccess })
     defaultValues: initialValues,
   });
 
-  const onSubmit = (values: TaskFormValues) => {
-    if (taskId) {
-      updateTask({ ...values, id: taskId });
-    } else {
-      createTask(values);
-    }
+  const onSubmit = async (values: TaskFormValues) => {
+    try {
+      if (taskId) {
+        await updateTask({ ...values, id: taskId });
+      } else {
+        await createTask(values);
+      }
 
-    onSuccess();
+    } catch (error) {
+      console.error('Error submitting form:', error);
+    }
   };
 
   return (
