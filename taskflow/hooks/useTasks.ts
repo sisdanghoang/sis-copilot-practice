@@ -8,12 +8,12 @@ const fetchTasks = async (): Promise<Task[]|void> => {
   return data;
 };
 
-const createTask = async (task: Task) : Promise<void>=> {
+const createTask = async (task: Task) : Promise<Task|void>=> {
   const { data } = await axios.post('/api/tasks', task);
   return data;
 };
 
-const updateTask = async (task: Task) : Promise<void>=>  {
+const updateTask = async (task: Task) : Promise<Task|void>=>  {
     const { data } = await axios.patch(`/api/tasks/${task.id}`, { status: task.status });
     return data;
 };
