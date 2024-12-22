@@ -4,61 +4,46 @@ import { z } from 'zod';
 export interface Task {
   id: string;
   title: string;
-  description?: string;
-  isComplete: boolean;
-  dueDate?: Date;
+  description: string;
+  status: 'todo' | 'in_progress' | 'completed';
+  priority: 'low' | 'medium' | 'high';
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 // CosmosTaskモデルの型定義
 export interface CosmosTask {
   id: string;
   title: string;
-  description?: string;
-  isComplete: boolean;
-  dueDate?: string;  // CosmosDBはISO 8601の文字列として日付を扱うことが多いため
-  _ts: number;  // タイムスタンプなど、CosmosDB固有のフィールド
+  description: string;
+  status: 'todo' | 'in_progress' | 'completed';
+  priority: 'low' | 'medium' | 'high';
+  createdAt: string;  // ISO 8601形式
+  updatedAt: string;  // ISO 8601形式
+  type: 'task';       // ドキュメント種別識別用
+  _partitionKey: string; // パーティションキー
 }
 
 // TaskモデルのZodスキーマ
 export const TaskSchema = z.object({
   id: z.string(),
   title: z.string(),
-  description: z.string().optional(),
-  isComplete: z.boolean(),
-  dueDate: z.date().optional()
+  description: z.string(),
+  status: z.enum(['todo', 'in_progress', 'completed']),
+  priority: z.enum(['low', 'medium', 'high']),
+  createdAt: z.date(),
+  updatedAt: z.date()
 });
+
 
 // CosmosTaskモデルのZodスキーマ
 export const CosmosTaskSchema = z.object({
   id: z.string(),
   title: z.string(),
   description: z.string().optional(),
-  isComplete: z.boolean(),
-  dueDate: z.string().optional(),  // 文字列でのバリデーション
-  _ts: z.number()
+  status: z.enum(['todo', 'in_progress', 'completed']),
+  priority: z.enum(['low', 'medium', 'high']),
+  createdAt: z.date(),
+  updatedAt: z.date(),
+  _partitionKey: z.string()
 });
-
-// バリデーションの例
-const exampleTask = {
-  id: "1",
-  title: "Write TypeScript types",
-  isComplete: false,
-  dueDate: new Date()
-};
-
-const exampleCosmosTask = {
-  id: "1",
-  title: "Write TypeScript types",
-  isComplete: false,
-  dueDate: new Date().toISOString(),
-  _ts: Date.now()
-};
-
-// バリデーションの実行例
-try {
-  TaskSchema.parse(exampleTask);
-  CosmosTaskSchema.parse(exampleCosmosTask);
-  console.log('バリデーション成功');
-} catch (e) {
-  console.error('バリデーションエラー', e);
-}

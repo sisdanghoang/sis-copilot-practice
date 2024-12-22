@@ -1,40 +1,83 @@
-import { Task, CosmosTask, TaskSchema, CosmosTaskSchema } from './types';
+import { container } from "./cosmosdb";
+import { Task, CosmosTask } from "./types";
+import { handleCosmosError } from "./errorHandling";
 
-// TaskモデルからCosmosTaskモデルへの変換関数
-const toCosmosTask = (task: Task): CosmosTask => {
-  // バリデーション
-  TaskSchema.parse(task);
-  console.log('バリデーション成功');
-  return {
-    id: task.id,
-    title: task.title,
-    description: task.description,
-    isComplete: task.isComplete,
-    dueDate: task.dueDate?.toISOString(), // DateをISO 8601文字列に変換
-    _ts: Date.now() // 現在時刻のタイムスタンプ（例）
+// データ変換関数
+export const toTask = (cosmosTask: CosmosTask): Task => ({
+  id: cosmosTask.id,
+  title: cosmosTask.title,
+  description: cosmosTask.description,
+  status: cosmosTask.status,
+  priority: cosmosTask.priority,
+  createdAt: new Date(cosmosTask.createdAt),
+  updatedAt: new Date(cosmosTask.updatedAt)
+});
+
+export const toCosmosTask = (task: Task): CosmosTask => ({
+  id: task.id,
+  title: task.title,
+  description: task.description,
+  status: task.status,
+  priority: task.priority,
+  createdAt: task.createdAt.toISOString(),
+  updatedAt: task.updatedAt.toISOString(),
+  type: 'task',
+  _partitionKey: task.id
+});
+
+// CRUD操作関数
+export const getTasks = async (): Promise<Task[]> => {
+  try {
+    const { resources } = await container.items.query("SELECT * from c").fetchAll();
+    return resources.map(toTask);
+  } catch (error) {
+    throw handleCosmosError(error);
+  }
+};
+
+
+export const getTask = async (id: string): Promise<Task> => {
+    try {
+      const { resource } = await container.item(id, id).read();
+      if (!resource) { // resourceがundefinedでないことを確認
+        throw new Error(`Task with id ${id} not found.`);
+      }
+      return toTask(resource);
+    } catch (error) {
+      throw handleCosmosError(error);
+    }
   };
-};
 
-// CosmosTaskモデルからTaskモデルへの変換関数
-const toTask = (cosmosTask: CosmosTask): Task => {
-  // バリデーション
-  CosmosTaskSchema.parse(cosmosTask);
-  console.log('バリデーション成功');
-  return {
-    id: cosmosTask.id,
-    title: cosmosTask.title,
-    description: cosmosTask.description,
-    isComplete: cosmosTask.isComplete,
-    dueDate: cosmosTask.dueDate ? new Date(cosmosTask.dueDate) : undefined // ISO 8601文字列をDate型に変換
+  export const createTask = async (task: Task): Promise<Task> => {
+    try {
+      const cosmosTask = toCosmosTask(task);
+      const { resource } = await container.items.create(cosmosTask);
+      if (!resource) { // resourceがundefinedでないことを確認
+        throw new Error('Failed to create task.');
+      }
+      return toTask(resource);
+    } catch (error) {
+      throw handleCosmosError(error);
+    }
   };
+
+  export const updateTask = async (id: string, task: Task): Promise<Task> => {
+    try {
+      const cosmosTask = toCosmosTask(task);
+      const { resource } = await container.item(id, id).replace(cosmosTask);
+      if (!resource) { // resourceがundefinedでないことを確認
+        throw new Error(`Failed to update task with id ${id}.`);
+      }
+      return toTask(resource);
+    } catch (error) {
+      throw handleCosmosError(error);
+    }
+  };
+
+export const deleteTask = async (id: string): Promise<void> => {
+  try {
+    await container.item(id, id).delete();
+  } catch (error) {
+    throw handleCosmosError(error);
+  }
 };
-
-import { container } from './cosmosdb';
-
-// 任意のクエリでタスクを取得するヘルパー関数
-const queryTasks = async (query: string) => {
-  const { resources } = await container.items.query(query).fetchAll();
-  return resources.map(toTask);
-};
-
-export { toCosmosTask, toTask, queryTasks };
