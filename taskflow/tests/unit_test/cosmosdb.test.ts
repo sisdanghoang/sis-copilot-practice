@@ -1,5 +1,5 @@
 // tests/cosmosdb-debug.test.ts
-import { Task } from '../lib/types';
+import { Task } from '../../lib/types';
 
 jest.mock('@azure/cosmos');
 
@@ -9,7 +9,7 @@ jest.mock('../lib/cosmosHelpers', () => ({
 }));
 
 // Import the mocked functions
-import { getTasks, createTask } from '../lib/cosmosHelpers';
+import { getTasks, createTask } from '../../lib/cosmosHelpers';
 
 describe('Cosmos DB Integration', () => {
   beforeEach(() => {

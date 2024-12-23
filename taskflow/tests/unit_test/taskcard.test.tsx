@@ -1,9 +1,9 @@
 import React from 'react';
 import { render, screen,fireEvent  } from '@testing-library/react';
 import {act} from 'react';
-import TaskCard from '../components/TaskCard';
-import { Task } from '../lib/types';
-import Providers from '../components/providers';
+import TaskCard from '../../components/TaskCard';
+import { Task } from '../../lib/types';
+import Providers from '../../components/providers';
 
 test('タスクの情報が正しく表示されること', () => {
   const task: Task = {

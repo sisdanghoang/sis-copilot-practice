@@ -1,8 +1,8 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { act } from 'react';
-import TaskFormModal from '../components/TaskForm';
-import { TaskFormValues } from '../lib/types';
-import Providers from '../components/providers';
+import TaskFormModal from '../../components/TaskForm';
+import { TaskFormValues } from '../../lib/types';
+import Providers from '../../components/providers';
 
 const mockOnClose = jest.fn();
 const mockCreateTask = jest.fn();

@@ -29,8 +29,8 @@ export interface CosmosTask {
 // TaskモデルのZodスキーマ
 export const TaskSchema = z.object({
   id: z.string(),
-  title: z.string().min(1, 'title is required'),
-  description: z.string().min(1, 'description is required'),
+  title: z.string().min(1, 'タイトルは必須です'),
+  description: z.string().min(1, '説明は必須です'),
   status: z.enum(['not_started', 'in_progress', 'completed']),
   priority: z.enum(['low', 'medium', 'high']),
   dueDate: z.date(),
@@ -39,8 +39,8 @@ export const TaskSchema = z.object({
 });
 
 export const TaskFormSchema = z.object({
-  title: z.string().min(1, 'title is required'),
-  description: z.string().min(1, 'description is required'),
+  title: z.string().min(1, 'タイトルは必須です'),
+  description: z.string().min(1, '説明は必須です'),
   status: z.enum(['not_started', 'in_progress', 'completed']),
   priority: z.enum(['low', 'medium', 'high']),
   dueDate: z.union([z.string(), z.date()]).optional(),
