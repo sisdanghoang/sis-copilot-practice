@@ -8,7 +8,6 @@ node_modules
 build
 out
 
-docs/demo
 # Ignore the .next folder in the root and any subdirectories
 /.next/
 **/.next/
