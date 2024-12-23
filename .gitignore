@@ -5,10 +5,17 @@
 venv
 env
 node_modules
+**/build/
 build
 out
 
+docs/demo
+taskflow/public
+taskflow/node_modules
+taskflow/package-lock.json
+*.ico
+*.png
 # Ignore the .next folder in the root and any subdirectories
-/.next/
+.next/
 **/.next/
 taskflow/playwright-report
