@@ -14,7 +14,7 @@
 まず、GitHubからTaskFlowのリポジトリをクローンします。
 
 ```bash
-git clone https://github.com/your-username/taskflow.git
+git clone https://github.com/sisdanghoang/sis-copilot-practice.git
 cd taskflow
 ```
 
