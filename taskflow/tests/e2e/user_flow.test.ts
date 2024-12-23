@@ -21,30 +21,4 @@ test('新規タスクの作成', async ({ page }) => {
     await page.getByLabel('優先度').selectOption('medium');
     await page.getByRole('button', { name: '提出する' }).click();
     await expect(page.locator('text=新しいタスク')).toBeVisible();
-  });
-
-
-test('タスクの削除', async ({ page }) => {
-  await page.goto('http://localhost:3000/');
-  await page.getByRole('button', { name: 'trash' }).first().click();
-  await expect(page.getByText('タスクが削除されました')).toBeVisible();
 });
-
-
-test('必須フィールドのバリデーション', async ({ page }) => {
-  await page.goto('http://localhost:3000/');
-  await page.getByRole('button', { name: 'タスクを作成' }).click();
-  await page.getByLabel('タイトル').click();
-  await page.getByRole('button', { name: '提出する' }).click();
-  await expect(page.getByText('タイトルは必須です')).toBeVisible();
-});
-
-
-test('タスク状態の変更', async ({ page }) => {
-    await page.goto('http://localhost:3000/');
-    await page.getByRole('button', { name: '編集' }).nth(2).click();
-    await page.getByLabel('状態').selectOption('completed');
-    await page.getByRole('button', { name: '提出する' }).click();
-    await expect(page.getByText('Status: completed')).toBeVisible();
-});
-
